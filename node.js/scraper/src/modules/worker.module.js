@@ -1,10 +1,14 @@
 import { Scraper } from './scraper.module'
+import { ChildProcess } from 'child_process';
 class WorkerStatus {
     static get __BUSY__(){
         return 'busy';
     }
     static get __FREE__(){
         return 'free';
+    }
+    static get __REMOVED__(){
+        return 'removed'
     }
 }
 class Worker {
@@ -23,6 +27,9 @@ class Worker {
         if(str === WorkerStatus.__BUSY__ || str === WorkerStatus.__FREE__)
             this._status = str;
     }
+    /**
+     * @returns {ChildProcess}
+     */
     getWorker(){
         return this._worker;
     }
@@ -35,7 +42,8 @@ class WorkerManager {
         this._workers = [];
         this._workerStatus = {
             free:[],
-            busy:[]
+            busy:[],
+            removed:[]
         }
     }
     /**
@@ -87,6 +95,9 @@ class WorkerManager {
      */
     getWorkerAt(index){
         return this._workers[index];
+    }
+    removeWorker(index){
+        this._workers[index].setStatus(WorkerStatus.__REMOVED__);
     }
 }
 class WorkerProcess{
