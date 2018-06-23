@@ -8,7 +8,11 @@ class FetchData {
             request(this._url, (error, response, html)=> {
                 if(!error){
                     resolve(html);
-                }else reject(error);
+                }else {
+                    console.log('error')
+                    reject(error);
+
+                }
             });
         });
     }

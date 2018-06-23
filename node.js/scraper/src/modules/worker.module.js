@@ -27,6 +27,9 @@ class Worker {
         if(str === WorkerStatus.__BUSY__ || str === WorkerStatus.__FREE__)
             this._status = str;
     }
+    getStatus(){
+        return this._status;
+    }
     /**
      * @returns {ChildProcess}
      */
@@ -97,7 +100,16 @@ class WorkerManager {
         return this._workers[index];
     }
     removeWorker(index){
-        this._workers[index].setStatus(WorkerStatus.__REMOVED__);
+        this.setWorkerStatus(index, WorkerStatus.__REMOVED__);
+    }
+    setWorkerStatus(index, status){
+        const prevStatus = this._workers[index].getStatus();
+        const workerIndex = this._workerStatus[prevStatus].indexOf(index);
+        if(workerIndex >= 0){
+            this._workerStatus[prevStatus].splice(workerIndex,1);
+        }
+        this._workers[index].setStatus(status);
+        this._workerStatus[status].push(index);
     }
 }
 class WorkerProcess{
@@ -107,6 +119,7 @@ class WorkerProcess{
             const {url, level} = message;
             const scraper = new Scraper(url);
             const links = await scraper.scrape();
+            console.log(process.pid);
             process.send(
                 {
                     entry: url,

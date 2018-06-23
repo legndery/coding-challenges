@@ -58028,7 +58028,6 @@ WError.prototype.cause = function we_cause(c)
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "config", function() { return config; });
 const config = {
-    BASE_URL: 'http://medium.com',
     DEFAULT_URL: 'http://medium.com',
     DEFAULT_CONNECTION: 5,
     DEFAULT_FILENAME: 'log.txt'
@@ -58057,16 +58056,21 @@ __webpack_require__.r(__webpack_exports__);
 
 
 
+
 class MasterProcess {
     constructor(cluster, config){
         this._cluster = cluster;
         this._config = config;
     }
+    /**
+     * This is mostly the constructor part. But in worker process this will be instantiated to so the
+     * below portion is decoupled.
+     */
     initiateForMaster(){
         this._url = this._config.url || this._config.DEFAULT_URL;
         this.filename = this._config.filename || this._config.DEFAULT_FILENAME;
         //////////////
-        this._level = this._config.level || this._config.DEFAULT_LEVEL;
+        this._level = this._config.level===0?0:(this._config.level || this._config.DEFAULT_LEVEL);
         this._currentLevel = 0;
         /////////////
         this.remaining_links_number = 1;
@@ -58084,6 +58088,7 @@ class MasterProcess {
         /** @type {cluster} */
         const cluster = this._cluster;
         if(cluster.isMaster){
+            console.log(Date.now());
             this.initiateForMaster();
             for(let i=0;i<_config_config__WEBPACK_IMPORTED_MODULE_1__["config"].DEFAULT_CONNECTION;i++){
                 const worker = cluster.fork();
@@ -58137,7 +58142,6 @@ class MasterProcess {
         if(link.error === 0){
             this.remaining_links_number -=1;
         }
-        
         return link;
     }
     postLinkFetch(message){
@@ -58157,8 +58161,6 @@ class MasterProcess {
         }
 
         _utils_io_util__WEBPACK_IMPORTED_MODULE_3__["WriteToFile"].loglinks('log.txt', filteredLinks);
-
-        console.log(filteredLinks.length);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
     }
@@ -58169,20 +58171,23 @@ class MasterProcess {
             const worker = workers[i];
             ({ link, error} = this.pluckLink());
             if(link){
-                worker.setStatus(_modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerStatus"].__BUSY__);
+                this._workerManager.setWorkerStatus(i, _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerStatus"].__BUSY__);
                 worker.getWorker().send({
                     url: link,
                     level: this._currentLevel
                 });
+            }else{
+                break;
             }
-            break;
         }
+        console.log(error, this.crawled_links.length);
         switch(error){
             case 1:
             if(this._workerManager.getBusyWorkers().length > 0){
+                console.log('break')
                 break;
             }
-            case 2:
+            case 2:console.log(this._workerManager.getFreeWorkers().length);
             this._workerManager.getFreeWorkers().forEach((workers, index)=>{
                 workers.getWorker().disconnect();
                 this._workerManager.removeWorker(index);
@@ -58194,6 +58199,7 @@ _config_config__WEBPACK_IMPORTED_MODULE_1__["config"].level = 1;
 _config_config__WEBPACK_IMPORTED_MODULE_1__["config"].url='https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a'
 const master = new MasterProcess(cluster__WEBPACK_IMPORTED_MODULE_0___default.a,_config_config__WEBPACK_IMPORTED_MODULE_1__["config"]);
 master.start();
+process.on('exit', function(){console.log(Date.now())});
 
 /***/ }),
 
@@ -58219,7 +58225,11 @@ class FetchData {
             request__WEBPACK_IMPORTED_MODULE_0___default()(this._url, (error, response, html)=> {
                 if(!error){
                     resolve(html);
-                }else reject(error);
+                }else {
+                    console.log('error')
+                    reject(error);
+
+                }
             });
         });
     }
@@ -58345,6 +58355,9 @@ class Worker {
         if(str === WorkerStatus.__BUSY__ || str === WorkerStatus.__FREE__)
             this._status = str;
     }
+    getStatus(){
+        return this._status;
+    }
     /**
      * @returns {ChildProcess}
      */
@@ -58415,7 +58428,16 @@ class WorkerManager {
         return this._workers[index];
     }
     removeWorker(index){
-        this._workers[index].setStatus(WorkerStatus.__REMOVED__);
+        this.setWorkerStatus(index, WorkerStatus.__REMOVED__);
+    }
+    setWorkerStatus(index, status){
+        const prevStatus = this._workers[index].getStatus();
+        const workerIndex = this._workerStatus[prevStatus].indexOf(index);
+        if(workerIndex >= 0){
+            this._workerStatus[prevStatus].splice(workerIndex,1);
+        }
+        this._workers[index].setStatus(status);
+        this._workerStatus[status].push(index);
     }
 }
 class WorkerProcess{
@@ -58425,6 +58447,7 @@ class WorkerProcess{
             const {url, level} = message;
             const scraper = new _scraper_module__WEBPACK_IMPORTED_MODULE_0__["Scraper"](url);
             const links = await scraper.scrape();
+            console.log(process.pid);
             process.send(
                 {
                     entry: url,
