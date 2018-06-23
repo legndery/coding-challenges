@@ -11,6 +11,12 @@ class HTMLParser {
         const doms = $(selector);
         return doms;
     }
+    forEach(doms, callback){
+        const $ = this.$;
+        $(doms).each(function(i,element){
+            return callback(i,$(element));
+        });
+    }
 }
 export {
     HTMLParser
