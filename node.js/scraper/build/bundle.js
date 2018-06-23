@@ -58017,194 +58017,10 @@ WError.prototype.cause = function we_cause(c)
 
 /***/ }),
 
-/***/ "./src/config/config.js":
-/*!******************************!*\
-  !*** ./src/config/config.js ***!
-  \******************************/
-/*! exports provided: config */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "config", function() { return config; });
-const config = {
-    DEFAULT_URL: 'http://medium.com',
-    DEFAULT_CONNECTION: 5,
-    DEFAULT_FILENAME: 'log.txt'
-
-};
-
-
-
-/***/ }),
-
-/***/ "./src/index.js":
-/*!**********************!*\
-  !*** ./src/index.js ***!
-  \**********************/
-/*! no exports provided */
-/***/ (function(module, __webpack_exports__, __webpack_require__) {
-
-"use strict";
-__webpack_require__.r(__webpack_exports__);
-/* harmony import */ var cluster__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! cluster */ "cluster");
-/* harmony import */ var cluster__WEBPACK_IMPORTED_MODULE_0___default = /*#__PURE__*/__webpack_require__.n(cluster__WEBPACK_IMPORTED_MODULE_0__);
-/* harmony import */ var _config_config__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./config/config */ "./src/config/config.js");
-/* harmony import */ var _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! ./modules/worker.module */ "./src/modules/worker.module.js");
-/* harmony import */ var _utils_io_util__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./utils/io.util */ "./src/utils/io.util.js");
-
-
-
-
-
-class MasterProcess {
-    constructor(cluster, config){
-        this._cluster = cluster;
-        this._config = config;
-    }
-    /**
-     * This is mostly the constructor part. But in worker process this will be instantiated to so the
-     * below portion is decoupled.
-     */
-    initiateForMaster(){
-        this._url = this._config.url || this._config.DEFAULT_URL;
-        this.filename = this._config.filename || this._config.DEFAULT_FILENAME;
-        //////////////
-        this._level = this._config.level===0?0:(this._config.level || this._config.DEFAULT_LEVEL);
-        this._currentLevel = 0;
-        /////////////
-        this.remaining_links_number = 1;
-        this.remaining_links = [
-            [this._url]
-        ];
-        this.crawled_links = [];
-        this.linkMap = {};
-        ///////////////////////
-        this._workerManager = new _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerManager"]();
-        //start logging
-        _utils_io_util__WEBPACK_IMPORTED_MODULE_3__["WriteToFile"].writeArray(this.filename, [this._url]);
-    }
-    start(){
-        /** @type {cluster} */
-        const cluster = this._cluster;
-        if(cluster.isMaster){
-            this.initiateForMaster();
-            for(let i=0;i<_config_config__WEBPACK_IMPORTED_MODULE_1__["config"].DEFAULT_CONNECTION;i++){
-                const worker = cluster.fork();
-                
-                this._workerManager.addWorker(new _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["Worker"](worker, i, _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerStatus"].__FREE__));
-
-                worker.on('message', (message)=>{
-                    this.postLinkFetch(message);
-                    // there is a free worker now
-                    this._workerManager.setWorkerStatus(i, _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerStatus"].__FREE__);
-                    
-                    this.allotLinks();
-                });
-            }
-
-            this.allotLinks();
-
-        }else if(cluster.isWorker){
-            //create connection
-            new _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerProcess"]().work();
-        }
-    }
-    pluckLink(){
-        // 1 no links are there
-        // 2 level reached
-        // 3 no links in level
-        const link = {
-            error: 0,
-        }
-        if(this.remaining_links_number <= 0) {
-            link.error = 1;
-            return link;
-        }
-        let level = 0;
-        while(level <= this._level){
-            console.log('---')
-            if(this.remaining_links[level].length>0){
-                console.log('here i am')
-                link.link = this.remaining_links[level].splice(0,1)[0];
-                link.level = level;
-                break;
-            }
-            console.log('one level completed');
-            level++;
-        }
-        if(level >= this._level){
-            link.error = 2;
-        }
-        if(link.error === 0){
-            this.remaining_links_number -=1;
-        }
-        // console.log(link);
-        return link;
-    }
-    postLinkFetch(message){
-        const {entry, links, level} = message;
-        const filteredLinks = links.filter((link)=>{
-            if(this.linkMap[link]){
-                return false
-            }else{
-                this.linkMap[link] = true;
-                return true;
-            }
-        });
-        if(this.remaining_links.length > level){
-            this.remaining_links[level] = this.remaining_links[level].concat(filteredLinks);
-        }else{
-            this.remaining_links[level] = filteredLinks;
-        }
-        // console.log(filteredLinks.length, level);
-        // console.log(this.remaining_links[level].length);
-        _utils_io_util__WEBPACK_IMPORTED_MODULE_3__["WriteToFile"].loglinks('log.txt', filteredLinks);
-        this.remaining_links_number += filteredLinks.length;
-        this.crawled_links.push(entry);
-    }
-    allotLinks(){
-        const workers = this._workerManager.getFreeWorkers();
-        let link, error, level;
-        for(let i=0;i<workers.length;i++){
-            const worker = workers[i];
-            ({ link, error, level} = this.pluckLink());
-            if(link){
-                this._workerManager.setWorkerStatus(worker.getIndex(), _modules_worker_module__WEBPACK_IMPORTED_MODULE_2__["WorkerStatus"].__BUSY__);
-                worker.getWorker().send({
-                    url: link,
-                    level: level
-                });
-            }else{
-                break;
-            }
-        }
-        switch(error){
-            case 1:
-            case 2:
-            if(this._workerManager.getBusyWorkers().length > 0){
-                console.log('break')
-                break;
-            }
-            this._workerManager.getFreeWorkers().forEach((worker)=>{
-                console.log('disconnecting');
-                worker.getWorker().disconnect();
-                this._workerManager.removeWorker(worker.getIndex());
-            });
-        }
-    }
-}
-_config_config__WEBPACK_IMPORTED_MODULE_1__["config"].level = 2;
-_config_config__WEBPACK_IMPORTED_MODULE_1__["config"].url='https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a'
-const master = new MasterProcess(cluster__WEBPACK_IMPORTED_MODULE_0___default.a,_config_config__WEBPACK_IMPORTED_MODULE_1__["config"]);
-master.start();
-
-/***/ }),
-
-/***/ "./src/modules/fetcher.module.js":
-/*!***************************************!*\
-  !*** ./src/modules/fetcher.module.js ***!
-  \***************************************/
+/***/ "./src/components/fetcher.component.js":
+/*!*********************************************!*\
+  !*** ./src/components/fetcher.component.js ***!
+  \*********************************************/
 /*! exports provided: FetchData */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -58236,10 +58052,10 @@ class FetchData {
 
 /***/ }),
 
-/***/ "./src/modules/parser.module.js":
-/*!**************************************!*\
-  !*** ./src/modules/parser.module.js ***!
-  \**************************************/
+/***/ "./src/components/parser.component.js":
+/*!********************************************!*\
+  !*** ./src/components/parser.component.js ***!
+  \********************************************/
 /*! exports provided: HTMLParser */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
@@ -58272,30 +58088,30 @@ class HTMLParser {
 
 /***/ }),
 
-/***/ "./src/modules/scraper.module.js":
-/*!***************************************!*\
-  !*** ./src/modules/scraper.module.js ***!
-  \***************************************/
+/***/ "./src/components/scraper.component.js":
+/*!*********************************************!*\
+  !*** ./src/components/scraper.component.js ***!
+  \*********************************************/
 /*! exports provided: Scraper */
 /***/ (function(module, __webpack_exports__, __webpack_require__) {
 
 "use strict";
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Scraper", function() { return Scraper; });
-/* harmony import */ var _fetcher_module__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./fetcher.module */ "./src/modules/fetcher.module.js");
-/* harmony import */ var _parser_module__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./parser.module */ "./src/modules/parser.module.js");
+/* harmony import */ var _components_fetcher_component__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../components/fetcher.component */ "./src/components/fetcher.component.js");
+/* harmony import */ var _components_parser_component__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../components/parser.component */ "./src/components/parser.component.js");
 
 
 class Scraper {
     constructor(url){
         this._url = url
-        this._fetcher = new _fetcher_module__WEBPACK_IMPORTED_MODULE_0__["FetchData"](this._url);
+        this._fetcher = new _components_fetcher_component__WEBPACK_IMPORTED_MODULE_0__["FetchData"](this._url);
     }
     async scrape(){
         let hrefs = [];
         try{
             const html = await this._fetcher.fetch();
-            const Parser = new _parser_module__WEBPACK_IMPORTED_MODULE_1__["HTMLParser"](html);
+            const Parser = new _components_parser_component__WEBPACK_IMPORTED_MODULE_1__["HTMLParser"](html);
             const links = Parser.querySelectorAll('a[href*="medium.com"]');
             Parser.forEach(links, function(i, element){    
                 var href = element.attr('href');
@@ -58312,6 +58128,213 @@ class Scraper {
 
 /***/ }),
 
+/***/ "./src/config/config.js":
+/*!******************************!*\
+  !*** ./src/config/config.js ***!
+  \******************************/
+/*! exports provided: config */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "config", function() { return config; });
+const config = {
+    DEFAULT_URL: 'http://medium.com',
+    CONNECTIONS: 5,
+    DEFAULT_FILENAME: 'log.txt'
+
+};
+
+
+
+/***/ }),
+
+/***/ "./src/index.js":
+/*!**********************!*\
+  !*** ./src/index.js ***!
+  \**********************/
+/*! no exports provided */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _modules_master_module__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./modules/master.module */ "./src/modules/master.module.js");
+/* harmony import */ var _config_config__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./config/config */ "./src/config/config.js");
+/* harmony import */ var cluster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! cluster */ "cluster");
+/* harmony import */ var cluster__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(cluster__WEBPACK_IMPORTED_MODULE_2__);
+
+
+
+/**
+ * 
+ * Usage
+ * npm start -- [-u <url>] [-l <level>] [-c <connection>] [-o <output_filename>]
+ * If any of the value is not provided default value will be used
+ * 
+ */
+if(cluster__WEBPACK_IMPORTED_MODULE_2___default.a.isMaster){
+    const args = process.argv.slice(2);
+    if(args.length %2){
+        
+    }
+    _config_config__WEBPACK_IMPORTED_MODULE_1__["config"].level = 1;
+    _config_config__WEBPACK_IMPORTED_MODULE_1__["config"].url='https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a'
+    const master = new _modules_master_module__WEBPACK_IMPORTED_MODULE_0__["default"](cluster__WEBPACK_IMPORTED_MODULE_2___default.a,_config_config__WEBPACK_IMPORTED_MODULE_1__["config"]);
+    master.start();
+}
+
+
+/***/ }),
+
+/***/ "./src/modules/master.module.js":
+/*!**************************************!*\
+  !*** ./src/modules/master.module.js ***!
+  \**************************************/
+/*! exports provided: default */
+/***/ (function(module, __webpack_exports__, __webpack_require__) {
+
+"use strict";
+__webpack_require__.r(__webpack_exports__);
+/* harmony import */ var _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../modules/worker.module */ "./src/modules/worker.module.js");
+/* harmony import */ var _utils_io_util__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ../utils/io.util */ "./src/utils/io.util.js");
+
+
+
+class MasterProcess {
+    constructor(cluster, config){
+        this._cluster = cluster;
+        this._config = config;
+    }
+    /**
+     * This is mostly the constructor part. But in worker process this will be instantiated to so the
+     * below portion is decoupled.
+     */
+    initiateForMaster(){
+        this._url = this._config.url || this._config.DEFAULT_URL;
+        this.filename = this._config.filename || this._config.DEFAULT_FILENAME;
+        //////////////
+        this._level = this._config.level===0?0:(this._config.level || this._config.DEFAULT_LEVEL);
+        this._currentLevel = 0;
+        /////////////
+        this.remaining_links_number = 1;
+        this.remaining_links = [
+            [this._url]
+        ];
+        this.crawled_links = [];
+        this.linkMap = {};
+        ///////////////////////
+        this._workerManager = new _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["WorkerManager"]();
+        //start logging
+        _utils_io_util__WEBPACK_IMPORTED_MODULE_1__["WriteToFile"].writeArray(this.filename, [this._url]);
+    }
+    start(){
+        /** @type {cluster} */
+        const cluster = this._cluster;
+        if(cluster.isMaster){
+            this.initiateForMaster();
+            for(let i=0;i<this._config.CONNECTIONS;i++){
+                const worker = cluster.fork();
+                
+                this._workerManager.addWorker(new _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["Worker"](worker, i, _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["WorkerStatus"].__FREE__));
+
+                worker.on('message', (message)=>{
+                    this.postLinkFetch(message);
+                    // there is a free worker now
+                    this._workerManager.setWorkerStatus(i, _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["WorkerStatus"].__FREE__);
+                    
+                    this.allotLinks();
+                });
+            }
+
+            this.allotLinks();
+
+        }else if(cluster.isWorker){
+            //create connection
+            new _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["WorkerProcess"]().work();
+        }
+    }
+    pluckLink(){
+        // 1 no links are there
+        // 2 level reached
+        // 3 no links in level
+        const link = {
+            error: 0,
+        }
+        if(this.remaining_links_number <= 0) {
+            link.error = 1;
+            return link;
+        }
+        let level = 0;
+        while(level <= this._level){
+            if(this.remaining_links[level].length>0){
+                link.link = this.remaining_links[level].splice(0,1)[0];
+                link.level = level;
+                break;
+            }
+            level++;
+        }
+        if(level >= this._level){
+            link.error = 2;
+        }
+        if(link.error === 0){
+            this.remaining_links_number -=1;
+        }
+        // console.log(link);
+        return link;
+    }
+    postLinkFetch(message){
+        const {entry, links, level} = message;
+        const filteredLinks = links.filter((link)=>{
+            if(this.linkMap[link]){
+                return false
+            }else{
+                this.linkMap[link] = true;
+                return true;
+            }
+        });
+        if(this.remaining_links.length > level){
+            this.remaining_links[level] = this.remaining_links[level].concat(filteredLinks);
+        }else{
+            this.remaining_links[level] = filteredLinks;
+        }
+        // console.log(filteredLinks.length, level);
+        // console.log(this.remaining_links[level].length);
+        _utils_io_util__WEBPACK_IMPORTED_MODULE_1__["WriteToFile"].loglinks('log.txt', filteredLinks);
+        this.remaining_links_number += filteredLinks.length;
+        this.crawled_links.push(entry);
+    }
+    allotLinks(){
+        const workers = this._workerManager.getFreeWorkers();
+        let link, error, level;
+        for(let i=0;i<workers.length;i++){
+            const worker = workers[i];
+            ({ link, error, level} = this.pluckLink());
+            if(link){
+                this._workerManager.setWorkerStatus(worker.getIndex(), _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["WorkerStatus"].__BUSY__);
+                worker.getWorker().send({
+                    url: link,
+                    level: level
+                });
+            }else{
+                break;
+            }
+        }
+        if(error>0 && this._workerManager.getBusyWorkers().length <= 0){
+
+            this._workerManager.getFreeWorkers().forEach((worker)=>{
+                console.log('disconnecting');
+                worker.getWorker().disconnect();
+                this._workerManager.removeWorker(worker.getIndex());
+            });
+            
+        }
+    }
+}
+
+/* harmony default export */ __webpack_exports__["default"] = (MasterProcess);
+
+/***/ }),
+
 /***/ "./src/modules/worker.module.js":
 /*!**************************************!*\
   !*** ./src/modules/worker.module.js ***!
@@ -58325,7 +58348,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WorkerManager", function() { return WorkerManager; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "WorkerProcess", function() { return WorkerProcess; });
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "Worker", function() { return Worker; });
-/* harmony import */ var _scraper_module__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ./scraper.module */ "./src/modules/scraper.module.js");
+/* harmony import */ var _components_scraper_component__WEBPACK_IMPORTED_MODULE_0__ = __webpack_require__(/*! ../components/scraper.component */ "./src/components/scraper.component.js");
 /* harmony import */ var child_process__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! child_process */ "child_process");
 /* harmony import */ var child_process__WEBPACK_IMPORTED_MODULE_1___default = /*#__PURE__*/__webpack_require__.n(child_process__WEBPACK_IMPORTED_MODULE_1__);
 
@@ -58447,7 +58470,7 @@ class WorkerProcess{
     work(){
         process.on('message', async function(message) {
             const {url, level} = message;
-            const scraper = new _scraper_module__WEBPACK_IMPORTED_MODULE_0__["Scraper"](url);
+            const scraper = new _components_scraper_component__WEBPACK_IMPORTED_MODULE_0__["Scraper"](url);
             const links = await scraper.scrape();
             // console.log(process.pid);
             process.send(

@@ -1,5 +1,5 @@
-import { FetchData } from "./fetcher.module";
-import { HTMLParser } from "./parser.module";
+import { FetchData } from "../components/fetcher.component";
+import { HTMLParser } from "../components/parser.component";
 class Scraper {
     constructor(url){
         this._url = url

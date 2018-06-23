@@ -1,4 +1,4 @@
-import { Scraper } from './scraper.module'
+import { Scraper } from '../components/scraper.component'
 import { ChildProcess } from 'child_process';
 class WorkerStatus {
     static get __BUSY__(){
