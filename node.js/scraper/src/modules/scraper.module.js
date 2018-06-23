@@ -6,16 +6,20 @@ class Scraper {
         this._fetcher = new FetchData(this._url);
     }
     async scrape(){
-        const html = await this._fetcher.fetch();
-        const Parser = new HTMLParser(html);
-        const links = Parser.querySelectorAll('a[href*="medium.com"]');
-        
         let hrefs = [];
-        Parser.forEach(links, function(i, element){    
-            var href = element.attr('href');
-            hrefs.push(href);
-        });
+        try{
+            const html = await this._fetcher.fetch();
+            const Parser = new HTMLParser(html);
+            const links = Parser.querySelectorAll('a[href*="medium.com"]');
+            Parser.forEach(links, function(i, element){    
+                var href = element.attr('href');
+                hrefs.push(href);
+            });
+        }catch(err){
+            console.log(err);
+        }
         return hrefs;
+
     }
 }
 export {Scraper}

@@ -119,7 +119,7 @@ class WorkerProcess{
             const {url, level} = message;
             const scraper = new Scraper(url);
             const links = await scraper.scrape();
-            console.log(process.pid);
+            // console.log(process.pid);
             process.send(
                 {
                     entry: url,

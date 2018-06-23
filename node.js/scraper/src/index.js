@@ -34,7 +34,6 @@ class MasterProcess {
         /** @type {cluster} */
         const cluster = this._cluster;
         if(cluster.isMaster){
-            console.log(Date.now());
             this.initiateForMaster();
             for(let i=0;i<config.DEFAULT_CONNECTION;i++){
                 const worker = cluster.fork();
@@ -44,10 +43,12 @@ class MasterProcess {
                 worker.on('message', (message)=>{
                     this.postLinkFetch(message);
                     // there is a free worker now
-                    this._workerManager.getWorkerAt(i).setStatus(WorkerStatus.__FREE__);
+                    this._workerManager.setWorkerStatus(i, WorkerStatus.__FREE__);
+                    
                     this.allotLinks();
                 });
             }
+
             this.allotLinks();
 
         }else if(cluster.isWorker){
@@ -56,8 +57,6 @@ class MasterProcess {
         }
     }
     pluckLink(){
-        // console.log(this.remaining_links);
-        // console.log(this._currentLevel, this._level);
         // 1 no links are there
         // 2 level reached
         // 3 no links in level
@@ -68,26 +67,25 @@ class MasterProcess {
             link.error = 1;
             return link;
         }
-
-        if(this.remaining_links[this._currentLevel].length>0){
-            console.log('here i am')
-            link.link = this.remaining_links[this._currentLevel].splice(0,1)[0];
-        }else if(this._currentLevel < this._level){
-            //one level completed
-            console.log('one level completed');
-            this._currentLevel++;
-            // console.log(this._currentLevel, this._level);
-            if(this.remaining_links[this._currentLevel].length>0){
-                link.link = this.remaining_links[this._currentLevel].splice(0,1)[0];
-            }else{
-                link.error = 3;
+        let level = 0;
+        while(level <= this._level){
+            console.log('---')
+            if(this.remaining_links[level].length>0){
+                console.log('here i am')
+                link.link = this.remaining_links[level].splice(0,1)[0];
+                link.level = level;
+                break;
             }
-        }else if(this._currentLevel === this._level){
+            console.log('one level completed');
+            level++;
+        }
+        if(level >= this._level){
             link.error = 2;
         }
         if(link.error === 0){
             this.remaining_links_number -=1;
         }
+        // console.log(link);
         return link;
     }
     postLinkFetch(message){
@@ -101,48 +99,48 @@ class MasterProcess {
             }
         });
         if(this.remaining_links.length > level){
-            this.remaining_links[level].concat(filteredLinks);
+            this.remaining_links[level] = this.remaining_links[level].concat(filteredLinks);
         }else{
             this.remaining_links[level] = filteredLinks;
         }
-
+        // console.log(filteredLinks.length, level);
+        // console.log(this.remaining_links[level].length);
         WriteToFile.loglinks('log.txt', filteredLinks);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
     }
     allotLinks(){
         const workers = this._workerManager.getFreeWorkers();
-        let link, error;
+        let link, error, level;
         for(let i=0;i<workers.length;i++){
             const worker = workers[i];
-            ({ link, error} = this.pluckLink());
+            ({ link, error, level} = this.pluckLink());
             if(link){
-                this._workerManager.setWorkerStatus(i, WorkerStatus.__BUSY__);
+                this._workerManager.setWorkerStatus(worker.getIndex(), WorkerStatus.__BUSY__);
                 worker.getWorker().send({
                     url: link,
-                    level: this._currentLevel
+                    level: level
                 });
             }else{
                 break;
             }
         }
-        console.log(error, this.crawled_links.length);
         switch(error){
             case 1:
+            case 2:
             if(this._workerManager.getBusyWorkers().length > 0){
                 console.log('break')
                 break;
             }
-            case 2:console.log(this._workerManager.getFreeWorkers().length);
-            this._workerManager.getFreeWorkers().forEach((workers, index)=>{
-                workers.getWorker().disconnect();
-                this._workerManager.removeWorker(index);
+            this._workerManager.getFreeWorkers().forEach((worker)=>{
+                console.log('disconnecting');
+                worker.getWorker().disconnect();
+                this._workerManager.removeWorker(worker.getIndex());
             });
         }
     }
 }
-config.level = 1;
+config.level = 2;
 config.url='https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a'
 const master = new MasterProcess(cluster,config);
 master.start();
-process.on('exit', function(){console.log(Date.now())});
