@@ -1,6 +1,7 @@
 import MasterProcess from './modules/master.module'
 import { config } from './config/config'
 import cluster from 'cluster';
+import { WorkerProcess } from "./modules/worker.module";
 /**
  * 
  * Usage
@@ -9,12 +10,33 @@ import cluster from 'cluster';
  * 
  */
 if(cluster.isMaster){
-    const args = process.argv.slice(2);
-    if(args.length %2){
-        
+    function processArguments(config, args){
+        if(args.length %2){
+            for(let i=0;i<args.length;i+=2){
+                switch(args[i]){
+                    case '-u': 
+                    config.url = args[i+1];
+                    break;
+                    case '-o':
+                    config.filename = args[i+1];
+                    break;
+                    case '-l':
+                    if(!isNaN(Number(args[i+1]))){
+                        config.level = parseInt(args[i+1]);
+                    }
+                    break;
+                    case '-c':
+                    if(!isNaN(Number(args[i+1]))){
+                        config.CONNECTIONS = parseInt(args[i+1]);
+                    }
+                    break;
+                }
+            }
+        }
     }
-    config.level = 1;
-    config.url='https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a'
-    const master = new MasterProcess(cluster,config);
-    master.start();
+    const args = process.argv.slice(2);
+    processArguments(config, args);
+    new MasterProcess(cluster,config).start();
+}else{
+    new WorkerProcess().work();
 }

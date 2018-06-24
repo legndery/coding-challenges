@@ -1,10 +1,11 @@
-import { WorkerStatus, WorkerManager, Worker, WorkerProcess } from '../modules/worker.module';
+import { WorkerStatus, WorkerManager, Worker } from '../modules/worker.module';
 import  { WriteToFile } from '../utils/io.util'
 
 class MasterProcess {
-    constructor(cluster, config){
+    constructor(cluster, config, progressBar){
         this._cluster = cluster;
         this._config = config;
+        this._progressBar = progressBar;
     }
     /**
      * This is mostly the constructor part. But in worker process this will be instantiated to so the
@@ -49,15 +50,11 @@ class MasterProcess {
 
             this.allotLinks();
 
-        }else if(cluster.isWorker){
-            //create connection
-            new WorkerProcess().work();
         }
     }
     pluckLink(){
         // 1 no links are there
         // 2 level reached
-        // 3 no links in level
         const link = {
             error: 0,
         }
@@ -103,6 +100,7 @@ class MasterProcess {
         WriteToFile.loglinks('log.txt', filteredLinks);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
+        console.log('Link Crawled: '+ this.crawled_links.length);
     }
     allotLinks(){
         const workers = this._workerManager.getFreeWorkers();

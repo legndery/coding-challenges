@@ -58139,9 +58139,10 @@ class Scraper {
 __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "config", function() { return config; });
 const config = {
-    DEFAULT_URL: 'http://medium.com',
+    DEFAULT_URL: 'https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a',
     CONNECTIONS: 5,
-    DEFAULT_FILENAME: 'log.txt'
+    DEFAULT_FILENAME: 'log.txt',
+    DEFAULT_LEVEL: 0
 
 };
 
@@ -58162,6 +58163,8 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony import */ var _config_config__WEBPACK_IMPORTED_MODULE_1__ = __webpack_require__(/*! ./config/config */ "./src/config/config.js");
 /* harmony import */ var cluster__WEBPACK_IMPORTED_MODULE_2__ = __webpack_require__(/*! cluster */ "cluster");
 /* harmony import */ var cluster__WEBPACK_IMPORTED_MODULE_2___default = /*#__PURE__*/__webpack_require__.n(cluster__WEBPACK_IMPORTED_MODULE_2__);
+/* harmony import */ var _modules_worker_module__WEBPACK_IMPORTED_MODULE_3__ = __webpack_require__(/*! ./modules/worker.module */ "./src/modules/worker.module.js");
+
 
 
 
@@ -58173,14 +58176,35 @@ __webpack_require__.r(__webpack_exports__);
  * 
  */
 if(cluster__WEBPACK_IMPORTED_MODULE_2___default.a.isMaster){
-    const args = process.argv.slice(2);
-    if(args.length %2){
-        
+    function processArguments(config, args){
+        if(args.length %2){
+            for(let i=0;i<args.length;i+=2){
+                switch(args[i]){
+                    case '-u': 
+                    config.url = args[i+1];
+                    break;
+                    case '-o':
+                    config.filename = args[i+1];
+                    break;
+                    case '-l':
+                    if(!isNaN(Number(args[i+1]))){
+                        config.level = parseInt(args[i+1]);
+                    }
+                    break;
+                    case '-c':
+                    if(!isNaN(Number(args[i+1]))){
+                        config.CONNECTIONS = parseInt(args[i+1]);
+                    }
+                    break;
+                }
+            }
+        }
     }
-    _config_config__WEBPACK_IMPORTED_MODULE_1__["config"].level = 1;
-    _config_config__WEBPACK_IMPORTED_MODULE_1__["config"].url='https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a'
-    const master = new _modules_master_module__WEBPACK_IMPORTED_MODULE_0__["default"](cluster__WEBPACK_IMPORTED_MODULE_2___default.a,_config_config__WEBPACK_IMPORTED_MODULE_1__["config"]);
-    master.start();
+    const args = process.argv.slice(2);
+    processArguments(_config_config__WEBPACK_IMPORTED_MODULE_1__["config"], args);
+    new _modules_master_module__WEBPACK_IMPORTED_MODULE_0__["default"](cluster__WEBPACK_IMPORTED_MODULE_2___default.a,_config_config__WEBPACK_IMPORTED_MODULE_1__["config"]).start();
+}else{
+    new _modules_worker_module__WEBPACK_IMPORTED_MODULE_3__["WorkerProcess"]().work();
 }
 
 
@@ -58201,9 +58225,10 @@ __webpack_require__.r(__webpack_exports__);
 
 
 class MasterProcess {
-    constructor(cluster, config){
+    constructor(cluster, config, progressBar){
         this._cluster = cluster;
         this._config = config;
+        this._progressBar = progressBar;
     }
     /**
      * This is mostly the constructor part. But in worker process this will be instantiated to so the
@@ -58248,15 +58273,11 @@ class MasterProcess {
 
             this.allotLinks();
 
-        }else if(cluster.isWorker){
-            //create connection
-            new _modules_worker_module__WEBPACK_IMPORTED_MODULE_0__["WorkerProcess"]().work();
         }
     }
     pluckLink(){
         // 1 no links are there
         // 2 level reached
-        // 3 no links in level
         const link = {
             error: 0,
         }
@@ -58302,6 +58323,7 @@ class MasterProcess {
         _utils_io_util__WEBPACK_IMPORTED_MODULE_1__["WriteToFile"].loglinks('log.txt', filteredLinks);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
+        console.log('Link Crawled: '+ this.crawled_links.length);
     }
     allotLinks(){
         const workers = this._workerManager.getFreeWorkers();
