@@ -9,7 +9,6 @@ class FetchData {
                 if(!error){
                     resolve(html);
                 }else {
-                    console.log('error')
                     reject(error);
 
                 }
