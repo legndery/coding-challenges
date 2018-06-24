@@ -40,7 +40,7 @@ npm start # start executing
 ```bash
 npm start -- [-u <url>] [-l <level>] [-c <connection>] [-o <output_filename>]
 ```
-`-u <url>` The entry point. Default: `https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a` 
-`-l <level>` Maximum Depth. Default: `2`
-`-c <connection>` Parallel connections. Default: `5`
-`-o <output>` Filename to write. Default: `log.txt`
+`-u <url>` The entry point. Default: `https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a`   
+`-l <level>` Maximum Depth. Default: `2`  
+`-c <connection>` Parallel connections. Default: `5`  
+`-o <output>` Filename to write. Default: `log.txt`  
