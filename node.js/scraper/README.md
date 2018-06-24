@@ -22,6 +22,15 @@ Write a scraper in node.js that will fetch all internal urls from all pages of m
     * `Parser`: Parses any HTML, has very basic functions which were needed
     * `Scraper`: Takes a link and returned crawlable hrefs using `Fetcher` and `Parser`
 * One utility script to save the link to file.
+* Config File which holds default configurations.
+```js
+{
+    DEFAULT_URL: 'https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a',
+    CONNECTIONS: 5,
+    DEFAULT_FILENAME: 'log.txt',
+    DEFAULT_LEVEL: 2
+}
+```
 
 ### Setup and Usage
 The repository can be setup and run using standard steps, which are cloning the repo, installing the dependencies and running `npm start`  
