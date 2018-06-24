@@ -16,7 +16,7 @@ class Scraper {
                 hrefs.push(href);
             });
         }catch(err){
-            console.log(err);
+            console.log('Error');
         }
         return hrefs;
 

@@ -2,6 +2,7 @@ import MasterProcess from './modules/master.module'
 import { config } from './config/config'
 import cluster from 'cluster';
 import { WorkerProcess } from "./modules/worker.module";
+import { CmdStyler } from './components/cmdline.component'
 /**
  * 
  * Usage
@@ -36,7 +37,14 @@ if(cluster.isMaster){
     }
     const args = process.argv.slice(2);
     processArguments(config, args);
-    new MasterProcess(cluster,config).start();
+    const style = new CmdStyler();
+    style.clearScreen();
+
+    new MasterProcess(cluster,config, style).start();
+
+    process.on('exit', function(){
+        style.setStringAt(1+config.CONNECTIONS,"-----------------------")
+    });
 }else{
     new WorkerProcess().work();
 }

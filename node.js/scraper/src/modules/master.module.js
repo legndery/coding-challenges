@@ -2,10 +2,11 @@ import { WorkerStatus, WorkerManager, Worker } from '../modules/worker.module';
 import  { WriteToFile } from '../utils/io.util'
 
 class MasterProcess {
-    constructor(cluster, config, progressBar){
+    constructor(cluster, config, cmdLine){
         this._cluster = cluster;
         this._config = config;
-        this._progressBar = progressBar;
+        this._cmdLine = cmdLine;
+        this.cmdStr = this._cmdLine.setStringAt;
     }
     /**
      * This is mostly the constructor part. But in worker process this will be instantiated to so the
@@ -28,16 +29,20 @@ class MasterProcess {
         this._workerManager = new WorkerManager();
         //start logging
         WriteToFile.writeArray(this.filename, [this._url]);
+        this._cmdLine.setTitle(`Link Crawled: 0 | Connections: 0 | Max Level: ${this._level}`);
     }
     start(){
         /** @type {cluster} */
         const cluster = this._cluster;
+        
         if(cluster.isMaster){
             this.initiateForMaster();
             for(let i=0;i<this._config.CONNECTIONS;i++){
                 const worker = cluster.fork();
                 
                 this._workerManager.addWorker(new Worker(worker, i, WorkerStatus.__FREE__));
+
+                this.cmdStr(i+1,'created '+ worker.process.pid);
 
                 worker.on('message', (message)=>{
                     this.postLinkFetch(message);
@@ -100,7 +105,7 @@ class MasterProcess {
         WriteToFile.loglinks('log.txt', filteredLinks);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
-        console.log('Link Crawled: '+ this.crawled_links.length);
+        this._cmdLine.setTitle(`Link Crawled: ${this.crawled_links.length} | Connections: ${this._workerManager._workers.length} | Max Level: ${this._level}`);
     }
     allotLinks(){
         const workers = this._workerManager.getFreeWorkers();
@@ -110,6 +115,8 @@ class MasterProcess {
             ({ link, error, level} = this.pluckLink());
             if(link){
                 this._workerManager.setWorkerStatus(worker.getIndex(), WorkerStatus.__BUSY__);
+                const statusStr = `${worker.getWorker().process.pid}: ${link}`.substr(0,80);
+                this.cmdStr(worker.getIndex()+1, statusStr)
                 worker.getWorker().send({
                     url: link,
                     level: level
@@ -121,8 +128,9 @@ class MasterProcess {
         if(error>0 && this._workerManager.getBusyWorkers().length <= 0){
 
             this._workerManager.getFreeWorkers().forEach((worker)=>{
-                console.log('disconnecting');
+                this.cmdStr(worker.getIndex()+1, `${worker.getWorker().process.pid}: Disconnecting`)
                 worker.getWorker().disconnect();
+                this.cmdStr(worker.getIndex()+1, `${worker.getWorker().process.pid}: Disconnected`);
                 this._workerManager.removeWorker(worker.getIndex());
             });
             
