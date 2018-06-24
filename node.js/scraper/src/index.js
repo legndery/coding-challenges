@@ -12,7 +12,7 @@ import { CmdStyler } from './components/cmdline.component'
  */
 if(cluster.isMaster){
     function processArguments(config, args){
-        if(args.length %2){
+        if(args.length %2 === 0){
             for(let i=0;i<args.length;i+=2){
                 switch(args[i]){
                     case '-u': 

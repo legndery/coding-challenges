@@ -102,7 +102,7 @@ class MasterProcess {
         }
         // console.log(filteredLinks.length, level);
         // console.log(this.remaining_links[level].length);
-        WriteToFile.loglinks('log.txt', filteredLinks);
+        WriteToFile.loglinks(this.filename, filteredLinks);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
         this._cmdLine.setTitle(`Link Crawled: ${this.crawled_links.length} | Connections: ${this._workerManager._workers.length} | Max Level: ${this._level}`);

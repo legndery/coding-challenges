@@ -60163,7 +60163,7 @@ __webpack_require__.r(__webpack_exports__);
 /* harmony export (binding) */ __webpack_require__.d(__webpack_exports__, "config", function() { return config; });
 const config = {
     DEFAULT_URL: 'https://medium.com/javascript-studio/visualizing-call-trees-c3a68865853a',
-    CONNECTIONS: 10,
+    CONNECTIONS: 5,
     DEFAULT_FILENAME: 'log.txt',
     DEFAULT_LEVEL: 2
 
@@ -60202,7 +60202,7 @@ __webpack_require__.r(__webpack_exports__);
  */
 if(cluster__WEBPACK_IMPORTED_MODULE_2___default.a.isMaster){
     function processArguments(config, args){
-        if(args.length %2){
+        if(args.length %2 === 0){
             for(let i=0;i<args.length;i+=2){
                 switch(args[i]){
                     case '-u': 
@@ -60357,7 +60357,7 @@ class MasterProcess {
         }
         // console.log(filteredLinks.length, level);
         // console.log(this.remaining_links[level].length);
-        _utils_io_util__WEBPACK_IMPORTED_MODULE_1__["WriteToFile"].loglinks('log.txt', filteredLinks);
+        _utils_io_util__WEBPACK_IMPORTED_MODULE_1__["WriteToFile"].loglinks(this.filename, filteredLinks);
         this.remaining_links_number += filteredLinks.length;
         this.crawled_links.push(entry);
         this._cmdLine.setTitle(`Link Crawled: ${this.crawled_links.length} | Connections: ${this._workerManager._workers.length} | Max Level: ${this._level}`);
